@@ -1,0 +1,128 @@
+REM   Script: Session 04
+REM   project
+
+CREATE TABLE customer ( 
+  customer_id NUMBER(10) PRIMARY KEY, 
+  first_name VARCHAR2(50), 
+  last_name VARCHAR2(50), 
+  email VARCHAR2(50) UNIQUE, 
+  password VARCHAR2(50), 
+  phone VARCHAR2(20) 
+);
+
+CREATE TABLE destination ( 
+  destination_id NUMBER(10) PRIMARY KEY, 
+  name VARCHAR2(50), 
+  description VARCHAR2(200), 
+  price NUMBER(10, 2), 
+  rating NUMBER(1, 1) 
+);
+
+CREATE TABLE booking ( 
+  booking_id NUMBER(10) PRIMARY KEY, 
+  customer_id NUMBER(10), 
+  start_date DATE, 
+  end_date DATE, 
+  num_of_people NUMBER(3), 
+  status VARCHAR2(20), 
+  CONSTRAINT fk_customer FOREIGN KEY (customer_id) REFERENCES customer(customer_id) 
+);
+
+CREATE TABLE booking_detail ( 
+  booking_detail_id NUMBER(10) PRIMARY KEY, 
+  booking_id NUMBER(10), 
+  destination_id NUMBER(10), 
+  total_price NUMBER(10, 2), 
+  CONSTRAINT fk_booking FOREIGN KEY (booking_id) REFERENCES booking(booking_id), 
+  CONSTRAINT fk_destination FOREIGN KEY (destination_id) REFERENCES destination(destination_id) 
+);
+
+CREATE OR REPLACE TRIGGER update_rating 
+  AFTER INSERT ON booking_detail 
+  FOR EACH ROW 
+BEGIN 
+  DECLARE 
+    total_rating INT; 
+    total_bookings INT; 
+    new_rating INT; 
+  BEGIN 
+    SELECT SUM(rating), COUNT(*) INTO total_rating, total_bookings FROM destination JOIN booking_detail ON destination.destination_id = booking_detail.destination_id WHERE destination.destination_id = :new.destination_id; 
+    new_rating := total_rating / total_bookings; 
+    UPDATE destination SET rating = new_rating WHERE destination_id = :new.destination_id; 
+  END; 
+END;
+/
+
+CREATE OR REPLACE PROCEDURE get_bookings_by_customer( 
+  customer_id IN NUMBER, 
+  bookings OUT SYS_REFCURSOR 
+) 
+IS 
+BEGIN 
+  OPEN bookings FOR 
+    SELECT * FROM booking WHERE customer_id = customer_id; 
+END; 
+
+/
+
+CREATE OR REPLACE TRIGGER update_booking_status 
+AFTER UPDATE ON Booking_Detail 
+FOR EACH ROW 
+DECLARE 
+    v_booking_id NUMBER; 
+BEGIN 
+    SELECT booking_id 
+    INTO v_booking_id 
+    FROM Booking_Detail 
+    WHERE booking_detail_id = :new.booking_detail_id; 
+    UPDATE Booking 
+    SET status =  
+        (CASE 
+            WHEN EXISTS (SELECT 1 FROM Booking_Detail WHERE booking_id = v_booking_id AND status = 'Pending') THEN 'Pending' 
+            WHEN EXISTS (SELECT 1 FROM Booking_Detail WHERE booking_id = v_booking_id AND status = 'Cancelled') THEN 'Cancelled' 
+            ELSE 'Confirmed' 
+        END) 
+    WHERE booking_id = v_booking_id; 
+END; 
+/
+INSERT INTO Destination
+VALUES (1, 'New York', 'Statue of Liberty', 50.00, 8.5);
+
+INSERT INTO Destination
+VALUES (2, 'London', 'Big Ben', 40.00, 9.0);
+
+INSERT INTO Destination
+VALUES (3, 'Paris', 'Eiffel Tower', 30.00, 8.0);
+
+INSERT INTO Customer
+VALUES (1, 'John', 'Doe', 'johndoe@gmail.com', '12345', '123-456-7890');
+
+INSERT INTO Customer
+VALUES (2, 'Jane', 'Doe', 'janedoe@gmail.com', '12345', '987-654-3210');
+
+INSERT INTO Customer
+VALUES (3, 'Bob', 'Smith', 'bobsmith@gmail.com', '12345', '555-555-5555');
+
+INSERT INTO Booking
+VALUES (1, 1, '03-MAR-2023', '03-APR-2023', 1, 'Confirmed');
+
+INSERT INTO Booking
+VALUES (2, 2, '04-APR-2023', '04-MAY-2023', 2, 'Pending');
+
+INSERT INTO Booking
+VALUES (3, 3, '05-MAY-2023', '05-JUN-2023', 3, 'Confirmed');
+ALTER TABLE booking_Detail
+    MODIFY TOTAL_PRICE INT;
+ALTER TRIGGER update_rating DISABLE;
+INSERT INTO Booking_Detail
+VALUES (1, 1, 1, 50);
+
+INSERT INTO Booking_Detail
+VALUES (2, 2, 2, 40);
+
+INSERT INTO Booking_Detail
+VALUES (3, 3, 3, 30);
+SELECT * FROM BOOKING_DETAIL;
+SELECT * FROM CUSTOMER;
+SELECT * FROM DESTINATION;
+SELECT * FROM BOOKING;
